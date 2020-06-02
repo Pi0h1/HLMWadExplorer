@@ -224,6 +224,9 @@ public:
 	void Replace(WADDirEntry* dir, const wxString& sourceFileName);
 
 	WADDirEntry* FindDir(const wxString& path, bool createOnDemand = false);
+	void SetOffset(wxFileOffset o) { m_dataOffset = o; };
+
+	wxFileOffset CalculateOffset() const;
 
 private:
 	bool m_readOnly;

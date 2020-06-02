@@ -427,8 +427,15 @@ void ExploreFrame::OnSaveClicked( wxCommandEvent& event )
 		OnSaveAsClicked(event);
 		return;
 	}
-	else
-		CreatePatch();
+	else {
+		if (CreatePatch())
+		{
+			m_fileHistory.AddFileToHistory(m_patchFileName);
+
+			wxConfigPathChanger pathChanger(wxConfigBase::Get(), "/FileHistory/PatchFiles/");
+			m_fileHistory.Save(*wxConfigBase::Get());
+		}
+	}
 }
 
 void ExploreFrame::OnSaveAsClicked( wxCommandEvent& event )
@@ -449,6 +456,7 @@ void ExploreFrame::OnSaveAsClicked( wxCommandEvent& event )
 			m_fileHistory.Save(*wxConfigBase::Get());
 		}
 	}
+
 }
 
 void ExploreFrame::OnMergeClicked( wxCommandEvent& event )
@@ -525,6 +533,7 @@ void ExploreFrame::ExtractPak(const WADArchiveEntry* entry)
 	wxDirDialog dirDlg(this, _("Select folder to PAK file contents to"), extractFolder, wxDD_DEFAULT_STYLE);
 	if (dirDlg.ShowModal() == wxID_OK)
 	{
+		extractFolder = dirDlg.GetPath();
 		wxMemoryOutputStream oStr;
 		m_archive->Extract(*entry, oStr);
 		wxMemoryInputStream iStr(oStr);

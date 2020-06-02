@@ -329,7 +329,16 @@ bool WADArchive::Extract(const WADArchiveEntry& entry, wxOutputStream& oStr)
 	wxFileInputStream iStr(inputFileName);
 	if (entry.GetSourceFileName().empty())
 	{
-		wxFileOffset archiveOffset = (entry.GetSourceArchive()) ? entry.GetSourceArchive()->m_dataOffset : m_dataOffset;
+		//archiveoffset is wrong sometimes. Affects when saving regularly, but not when saving as. Why??!?!
+		//wxFileOffset archiveOffset = (entry.GetSourceArchive()) ? entry.GetSourceArchive()->m_dataOffset : m_dataOffset;
+		wxFileOffset archiveOffset;
+		if (entry.GetSourceArchive()) {
+			//archiveOffset = entry.GetSourceArchive()->m_dataOffset;
+			archiveOffset = entry.GetSourceArchive()->CalculateOffset();
+		}
+		else {
+			archiveOffset = m_dataOffset;
+		}
 		iStr.SeekI(archiveOffset + entry.GetOffset());
 	}
 
@@ -350,7 +359,7 @@ bool WADArchive::Extract(const WADArchiveEntry& entry, wxOutputStream& oStr)
 	}
 
 	delete[] buffer;
-
+	
 	return true;
 }
 
@@ -454,10 +463,11 @@ bool WADArchive::Write(wxOutputStream& oStr)
 
 		WriteDir(m_rootDir.get(), oStr);
 	}
-	
 	// Write file data
-	for (auto entry = m_entries.begin(); entry != m_entries.end(); ++entry)
+	for (auto entry = m_entries.begin(); entry != m_entries.end(); ++entry) {
 		Extract(*entry, oStr);
+	}
+		
 	
 	m_modified = false;
 	
@@ -484,7 +494,7 @@ bool WADArchive::CreatePatch(const wxString& targetFileName)
 	for (auto entry = m_entries.begin(); entry != m_entries.end(); ++entry)
 	{
 		if (entry->GetStatus() != WADArchiveEntry::Entry_Original)
-			patchArchive.Add(WADArchiveEntry(*entry, this));
+			patchArchive.Add(WADArchiveEntry(*entry, entry->GetSourceArchive()));
 	}
 
 	if (patchArchive.Write())
@@ -624,3 +634,114 @@ WADDirEntry* WADArchive::FindDir(const wxString& path, bool createOnDemand)
 	return result;
 }
 
+wxFileOffset WADArchive::CalculateOffset() const{
+	wxFileOffset myOffset;
+	wxFileName wadFN(m_fileName);
+
+	wxFileInputStream iStr(m_fileName);
+
+	char fileId[5];
+	iStr.Read(fileId, 4);
+	fileId[4] = 0;
+	if (strcmp(fileId, "AGAR") == 0)
+	{
+
+		wxUint32 majorVer;
+		wxUint32 minorVer;
+		iStr.Read(&majorVer, sizeof(majorVer));
+		iStr.Read(&minorVer, sizeof(minorVer));
+		wxUint32 extHeaderSize;
+		iStr.Read(&extHeaderSize, sizeof(extHeaderSize));
+		iStr.SeekI(extHeaderSize, wxFromCurrent);
+	}
+	else
+		iStr.SeekI(0);
+
+	if (m_format == FmtHM1)
+	{
+
+		wxUint32 dataOffset;
+		iStr.Read(&dataOffset, sizeof(dataOffset));
+
+		myOffset = dataOffset;
+	}
+
+	wxUint32 fileCount;
+	iStr.Read(&fileCount, sizeof(fileCount));
+	wxLogDebug("Found %d files in wad: %s", fileCount, m_fileName);
+
+	//m_entries.reserve(fileCount);
+
+	for (size_t fileIndex = 0; fileIndex < fileCount; fileIndex++)
+	{
+		wxUint32 fileNameLength;
+		iStr.Read(&fileNameLength, sizeof(fileNameLength));
+
+		wxCharBuffer fnBuf(fileNameLength);
+		iStr.Read(fnBuf.data(), fileNameLength);
+		wxString fileName(fnBuf);
+
+		if (m_format != FmtHM1)
+		{
+			wxUint64 fileSize;
+			iStr.Read(&fileSize, sizeof(fileSize));
+
+			wxUint64 fileOffset;
+			iStr.Read(&fileOffset, sizeof(fileOffset));
+
+			//m_entries.push_back(WADArchiveEntry(fileName, fileSize, fileOffset));
+		}
+		else
+		{
+			wxUint32 fileSize;
+			iStr.Read(&fileSize, sizeof(fileSize));
+
+			wxUint32 fileOffset;
+			iStr.Read(&fileOffset, sizeof(fileOffset));
+
+			//m_entries.push_back(WADArchiveEntry(fileName, fileSize, fileOffset));
+		}
+	}
+
+	if (m_format == FmtHM2v2)
+	{
+		// Parse directory table (currently unused but required to determine data offset)
+		wxUint32 dirCount;
+		iStr.Read(&dirCount, sizeof(dirCount));
+		for (int dirIndex = 0; dirIndex < dirCount; dirIndex++)
+		{
+			wxUint32 dirNameLength;
+			iStr.Read(&dirNameLength, sizeof(dirNameLength));
+
+			if (dirNameLength)
+			{
+				wxCharBuffer dirNameBuf(dirNameLength);
+				iStr.Read(dirNameBuf.data(), dirNameLength);
+				wxString dirName(dirNameBuf);
+			}
+
+			// Parse directory
+			wxUint32 entryCount;
+			iStr.Read(&entryCount, sizeof(entryCount));
+
+			for (int entryIndex = 0; entryIndex < entryCount; entryIndex++)
+			{
+				wxUint32 entryNameLength;
+				iStr.Read(&entryNameLength, sizeof(entryNameLength));
+
+				wxCharBuffer entryNameBuf(entryNameLength);
+				iStr.Read(entryNameBuf.data(), entryNameLength);
+				wxString entryName(entryNameBuf);
+
+				wxUint8 entryType;
+				iStr.Read(&entryType, sizeof(entryType));
+
+			}
+		}
+	}
+
+	if (m_format != FmtHM1)
+		myOffset = iStr.SeekI(0, wxFromCurrent);
+
+	return myOffset;
+}
