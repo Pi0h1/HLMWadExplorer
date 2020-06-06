@@ -136,7 +136,7 @@ private:
 
 ExploreFrame::ExploreFrame( wxWindow* parent ):
 	BaseExploreFrame( parent ),
-	m_archive(NULL)
+	m_archive(NULL), m_original_archive(NULL)
 {
 	UpdateTitle();
 #if defined(__WXMSW__)
@@ -390,6 +390,8 @@ bool ExploreFrame::OpenBaseFile(bool forceSelection)
 		m_fileListCtrl->SetFocus();
 	}
 
+	m_original_archive = new WADArchive(baseFileName.GetFullPath());
+
 	wxConfigBase::Get()->Write("BaseFile", baseFileName.GetFullPath());
 
 	return true;
@@ -505,14 +507,14 @@ bool ExploreFrame::CreatePatch()
 	if (patchCreated)
 	{
 		UpdateTitle();
-		wxMessageDialog msgDlg(this, _("The patch WAD has been saved\n\nDo you want to open the folder it was saved to?"), _("Information"), wxICON_INFORMATION | wxOK | wxCANCEL);
+		/*wxMessageDialog msgDlg(this, _("The patch WAD has been saved\n\nDo you want to open the folder it was saved to?"), _("Information"), wxICON_INFORMATION | wxOK | wxCANCEL);
 		msgDlg.SetOKCancelLabels(_("Open Folder"), wxID_CLOSE);
 		if (msgDlg.ShowModal() == wxID_OK)
 		{
 			wxFileName patchFN(m_patchFileName);
 			patchFN.SetFullName("");
 			wxLaunchDefaultApplication(patchFN.GetFullPath());
-		}
+		}*/
 	}
 
 	return patchCreated;
@@ -705,6 +707,20 @@ void ExploreFrame::OnReplaceClicked( wxCommandEvent& event )
 	}
 }
 
+void ExploreFrame::OnRemoveClicked(wxCommandEvent& event) {
+	//OutputDebugStringA("Remove clicked!");
+	const WADArchiveEntry* entry = GetSelectedEntry();
+	wxASSERT(entry != NULL);
+	if (entry->GetStatus() == WADArchiveEntry::Entry_Original) return;
+	WADDirEntry* dir = static_cast<WADDirEntry*>(m_fileListCtrl->GetSelection().GetID());
+	m_archive->RemoveEntry(entry);
+	m_fileListCtrl->GetModel()->ItemChanged(wxDataViewItem(dir));
+	wxDataViewEvent evt(wxEVT_DATAVIEW_SELECTION_CHANGED);
+	OnFileListSelectionChanged(evt);
+
+	UpdateTitle();
+}
+
 void ExploreFrame::OnAddClicked( wxCommandEvent& event )
 {
 	wxFileDialog fileDlg(this, _("Select file to add"), wxString(), wxString(), "*.*", wxFD_DEFAULT_STYLE | wxFD_FILE_MUST_EXIST);
@@ -760,6 +776,13 @@ void ExploreFrame::OnFileListSelectionChanged( wxDataViewEvent& event )
 	m_toolBar->EnableTool(ID_EXTRACT, fileSelected || m_fileListCtrl->GetSelectedItemsCount() > 1);
 	m_menubar->Enable(wxID_DELETE, fileSelected && m_fileListCtrl->GetSelectedItemsCount() > 0 && !m_archive->GetReadOnly());
 	
+	if (fileSelected && entry->GetStatus() != WADArchiveEntry::Entry_Original) {
+		m_menubar->Enable(ID_REMOVE, true);
+	}
+	else {
+		m_menubar->Enable(ID_REMOVE, false);
+	}
+
 	if (m_fileListCtrl->GetSelectedItemsCount() != 1)
 		return;
 

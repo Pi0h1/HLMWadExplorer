@@ -65,6 +65,10 @@ public:
 	{
 		return m_offset;
 	}
+
+	void SetOffset(wxInt64 o) {
+		m_offset = o;
+	}
 	
 	const wxString& GetSourceFileName() const
 	{
@@ -227,7 +231,7 @@ public:
 	void SetOffset(wxFileOffset o) { m_dataOffset = o; };
 
 	wxFileOffset CalculateOffset() const;
-
+	void RemoveEntry(const WADArchiveEntry *e);
 private:
 	bool m_readOnly;
 	WADFormat m_format;

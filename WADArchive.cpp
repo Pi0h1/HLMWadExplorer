@@ -338,7 +338,9 @@ bool WADArchive::Extract(const WADArchiveEntry& entry, wxOutputStream& oStr)
 		}
 		else {
 			archiveOffset = m_dataOffset;
+			//archiveOffset = CalculateOffset();
 		}
+		//issue with entry.GetOffset()
 		iStr.SeekI(archiveOffset + entry.GetOffset());
 	}
 
@@ -490,16 +492,28 @@ bool WADArchive::CreatePatch(const wxString& targetFileName)
 {
 	WADArchive patchArchive(targetFileName, true);
 	patchArchive.m_format = FmtHM2v2;
-
+	wxInt64 offset = 0;
 	for (auto entry = m_entries.begin(); entry != m_entries.end(); ++entry)
 	{
-		if (entry->GetStatus() != WADArchiveEntry::Entry_Original)
+		if (entry->GetStatus() != WADArchiveEntry::Entry_Original) {
 			patchArchive.Add(WADArchiveEntry(*entry, entry->GetSourceArchive()));
+		}
+			
 	}
+
+	
 
 	if (patchArchive.Write())
 	{
 		m_modified = false;
+		for (auto entry = m_entries.begin(); entry != m_entries.end(); ++entry)
+		{
+			if (entry->GetStatus() != WADArchiveEntry::Entry_Original) {
+				entry->SetOffset(offset);
+				offset += entry->GetSize();
+			}
+
+		}
 		return true;
 	}
 	else
@@ -689,7 +703,6 @@ wxFileOffset WADArchive::CalculateOffset() const{
 			wxUint64 fileOffset;
 			iStr.Read(&fileOffset, sizeof(fileOffset));
 
-			//m_entries.push_back(WADArchiveEntry(fileName, fileSize, fileOffset));
 		}
 		else
 		{
@@ -699,7 +712,6 @@ wxFileOffset WADArchive::CalculateOffset() const{
 			wxUint32 fileOffset;
 			iStr.Read(&fileOffset, sizeof(fileOffset));
 
-			//m_entries.push_back(WADArchiveEntry(fileName, fileSize, fileOffset));
 		}
 	}
 
@@ -744,4 +756,20 @@ wxFileOffset WADArchive::CalculateOffset() const{
 		myOffset = iStr.SeekI(0, wxFromCurrent);
 
 	return myOffset;
+}
+
+void WADArchive::RemoveEntry(const WADArchiveEntry *e) {
+	for (auto entry = m_entries.begin(); entry != m_entries.end(); ++entry)
+	{
+		const wxString s = entry->GetFileName();
+		const wxString p = e->GetFileName();
+		if (s.IsSameAs(p))
+		{
+			
+			m_modified = true;
+			entry->SetStatus(WADArchiveEntry::Entry_Original);
+			*entry = WADArchiveEntry(*entry, NULL);
+			//entry->SetSourceArchive(NULL);
+		}
+	}
 }

@@ -37,6 +37,7 @@ class ExploreFrame : public BaseExploreFrame
 		void OnSwitchBaseWadClicked(wxCommandEvent& event);
 		void OnExtractClicked( wxCommandEvent& event );
 		void OnReplaceClicked( wxCommandEvent& event );
+		void OnRemoveClicked(wxCommandEvent& event);
 		void OnAddClicked( wxCommandEvent& event );
 		void OnDeleteClicked( wxCommandEvent& event );
 		void OnQuitClicked( wxCommandEvent& event );
@@ -60,6 +61,7 @@ class ExploreFrame : public BaseExploreFrame
 		friend class FileDataModel;
 
 		wxSharedPtr<WADArchive> m_archive;
+		wxSharedPtr<WADArchive> m_original_archive;
 		wxString m_patchFileName;
 		wxFileHistory m_fileHistory;
 		bool m_ignoreSearch;

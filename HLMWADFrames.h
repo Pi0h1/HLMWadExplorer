@@ -47,6 +47,7 @@
 #define ID_OPEN_BASE_WAD 1001
 #define ID_EXTRACT 1002
 #define ID_REPLACE 1003
+#define ID_REMOVE 1004
 
 ///////////////////////////////////////////////////////////////////////////////
 /// Class BaseExploreFrame
@@ -81,6 +82,7 @@ class BaseExploreFrame : public wxFrame
 		virtual void OnQuitClicked( wxCommandEvent& event ) { event.Skip(); }
 		virtual void OnExtractClicked( wxCommandEvent& event ) { event.Skip(); }
 		virtual void OnReplaceClicked( wxCommandEvent& event ) { event.Skip(); }
+		virtual void OnRemoveClicked(wxCommandEvent& event) { event.Skip(); }
 		virtual void OnAddClicked( wxCommandEvent& event ) { event.Skip(); }
 		virtual void OnDeleteClicked( wxCommandEvent& event ) { event.Skip(); }
 		virtual void OnAboutClicked( wxCommandEvent& event ) { event.Skip(); }
