@@ -713,7 +713,11 @@ void ExploreFrame::OnRemoveClicked(wxCommandEvent& event) {
 	wxASSERT(entry != NULL);
 	if (entry->GetStatus() == WADArchiveEntry::Entry_Original) return;
 	WADDirEntry* dir = static_cast<WADDirEntry*>(m_fileListCtrl->GetSelection().GetID());
-	m_archive->RemoveEntry(entry);
+	const WADArchiveEntry* oentry = &(m_original_archive->GetEntry(entry->GetFileName()));
+	m_archive->RemoveEntry(entry, oentry);
+
+	
+
 	m_fileListCtrl->GetModel()->ItemChanged(wxDataViewItem(dir));
 	wxDataViewEvent evt(wxEVT_DATAVIEW_SELECTION_CHANGED);
 	OnFileListSelectionChanged(evt);

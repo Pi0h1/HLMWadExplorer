@@ -329,7 +329,6 @@ bool WADArchive::Extract(const WADArchiveEntry& entry, wxOutputStream& oStr)
 	wxFileInputStream iStr(inputFileName);
 	if (entry.GetSourceFileName().empty())
 	{
-		//archiveoffset is wrong sometimes. Affects when saving regularly, but not when saving as. Why??!?!
 		//wxFileOffset archiveOffset = (entry.GetSourceArchive()) ? entry.GetSourceArchive()->m_dataOffset : m_dataOffset;
 		wxFileOffset archiveOffset;
 		if (entry.GetSourceArchive()) {
@@ -506,6 +505,7 @@ bool WADArchive::CreatePatch(const wxString& targetFileName)
 	if (patchArchive.Write())
 	{
 		m_modified = false;
+		//each entry needs to update its offset
 		for (auto entry = m_entries.begin(); entry != m_entries.end(); ++entry)
 		{
 			if (entry->GetStatus() != WADArchiveEntry::Entry_Original) {
@@ -758,7 +758,7 @@ wxFileOffset WADArchive::CalculateOffset() const{
 	return myOffset;
 }
 
-void WADArchive::RemoveEntry(const WADArchiveEntry *e) {
+void WADArchive::RemoveEntry(const WADArchiveEntry *e, const WADArchiveEntry *o) {
 	for (auto entry = m_entries.begin(); entry != m_entries.end(); ++entry)
 	{
 		const wxString s = entry->GetFileName();
@@ -768,7 +768,7 @@ void WADArchive::RemoveEntry(const WADArchiveEntry *e) {
 			
 			m_modified = true;
 			entry->SetStatus(WADArchiveEntry::Entry_Original);
-			*entry = WADArchiveEntry(*entry, NULL);
+			*entry = WADArchiveEntry(*o, o->GetSourceArchive());
 			//entry->SetSourceArchive(NULL);
 		}
 	}

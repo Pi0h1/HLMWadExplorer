@@ -231,7 +231,7 @@ public:
 	void SetOffset(wxFileOffset o) { m_dataOffset = o; };
 
 	wxFileOffset CalculateOffset() const;
-	void RemoveEntry(const WADArchiveEntry *e);
+	void RemoveEntry(const WADArchiveEntry *e, const WADArchiveEntry *o);
 private:
 	bool m_readOnly;
 	WADFormat m_format;

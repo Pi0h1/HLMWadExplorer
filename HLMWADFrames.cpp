@@ -62,7 +62,7 @@ BaseExploreFrame::BaseExploreFrame( wxWindow* parent, wxWindowID id, const wxStr
 	replace->Enable( false );
 	
 	wxMenuItem* remove;
-	remove = new wxMenuItem(resource, ID_REMOVE, wxString(_("&Remove...")) + wxT('\t') + wxT("Ctrl+D"), wxEmptyString, wxITEM_NORMAL);
+	remove = new wxMenuItem(resource, ID_REMOVE, wxString(_("&Remove replaced entry...")) + wxT('\t') + wxT("Ctrl+D"), wxEmptyString, wxITEM_NORMAL);
 	resource->Append(remove);
 	remove->Enable(true);
 
