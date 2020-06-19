@@ -232,6 +232,8 @@ public:
 
 	wxFileOffset CalculateOffset() const;
 	void RemoveEntry(const WADArchiveEntry *e, const WADArchiveEntry *o);
+
+	void ResetOffsets();
 private:
 	bool m_readOnly;
 	WADFormat m_format;
@@ -243,4 +245,5 @@ private:
 	wxSharedPtr<WADArchive> m_patchArchive;
 
 	void ParseFile();
+	
 };

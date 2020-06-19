@@ -256,7 +256,7 @@ void ExploreFrame::OnWindowClose( wxCloseEvent& event )
 {
 	if (m_archive && m_archive->IsModified())
 	{
-		wxMessageDialog msgDlg(this, _("Do you wan't to save unsaved changes?"), _("Warning"), wxICON_WARNING | wxYES_NO | wxCANCEL);
+		wxMessageDialog msgDlg(this, _("Do you want to save unsaved changes?"), _("Warning"), wxICON_WARNING | wxYES_NO | wxCANCEL);
 		msgDlg.SetYesNoLabels(_("Save"), _("Don't Save"));
 
 		switch (msgDlg.ShowModal())
@@ -465,10 +465,20 @@ void ExploreFrame::OnMergeClicked( wxCommandEvent& event )
 {
 	MergeDialog dlg(this);
 	dlg.SetBaseWAD(m_archive->GetFileName());
+	dlg.SetPatchWAD(m_patchFileName);
 	if (dlg.ShowModal() == wxID_OK)
 	{
 		WADArchive patchArchive(dlg.GetPatchWAD());
+		if (!(patchArchive.GetEntryCount())) {
+			wxMessageDialog msgDlg(this, wxString::Format(_("The selected patch has no entries."),
+				patchArchive.GetEntryCount()), _("Warning"),
+				wxICON_WARNING | wxOK);
 
+			if (msgDlg.ShowModal() == wxID_OK) {
+				return;
+			}
+
+		}
 		wxMessageDialog msgDlg(this, wxString::Format(_("Applying patch\n\nThis patch contains %d new/modified files.\nAre you sure you want to apply this patch?"),
 													  patchArchive.GetEntryCount()), _("Warning"),
 							   wxICON_WARNING | wxOK | wxCANCEL | wxCANCEL_DEFAULT);
@@ -485,6 +495,7 @@ void ExploreFrame::OnMergeClicked( wxCommandEvent& event )
 			if (baseArchive.Write())
 			{
 				wxLogInfo(_("Patch merged"));
+				m_archive->ResetOffsets();
 			}
 		}
 	}

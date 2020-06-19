@@ -329,6 +329,9 @@ bool WADArchive::Extract(const WADArchiveEntry& entry, wxOutputStream& oStr)
 	wxFileInputStream iStr(inputFileName);
 	if (entry.GetSourceFileName().empty())
 	{
+		//this solution to the offset problem (using calculate offset) is bad.
+		//Need to update m_dataOffset when necessary
+
 		//wxFileOffset archiveOffset = (entry.GetSourceArchive()) ? entry.GetSourceArchive()->m_dataOffset : m_dataOffset;
 		wxFileOffset archiveOffset;
 		if (entry.GetSourceArchive()) {
@@ -340,6 +343,8 @@ bool WADArchive::Extract(const WADArchiveEntry& entry, wxOutputStream& oStr)
 			//archiveOffset = CalculateOffset();
 		}
 		//issue with entry.GetOffset()
+		//entry.GetOffset() has wrong value after merging (or just modifying base wad)
+		//This affects original entries. Need to update
 		iStr.SeekI(archiveOffset + entry.GetOffset());
 	}
 
@@ -500,8 +505,6 @@ bool WADArchive::CreatePatch(const wxString& targetFileName)
 			
 	}
 
-	
-
 	if (patchArchive.Write())
 	{
 		m_modified = false;
@@ -595,6 +598,8 @@ bool WADArchive::ApplyFilter(const wxString& filter)
 
 	wxString lowerFilter = filter.Lower();
 
+	if (m_entries.empty()) return true;
+
 	for (auto entry = m_entries.begin(); entry != m_entries.end(); ++entry)
 	{
 		if (lowerFilter.empty() ||
@@ -604,6 +609,8 @@ bool WADArchive::ApplyFilter(const wxString& filter)
 			static_cast<FolderWADDirEntry*>(dir)->AddFile(entry);
 		}
 	}
+
+	
 
 	if (!m_rootDir->GetChildCount())
 	{
@@ -769,7 +776,74 @@ void WADArchive::RemoveEntry(const WADArchiveEntry *e, const WADArchiveEntry *o)
 			m_modified = true;
 			entry->SetStatus(WADArchiveEntry::Entry_Original);
 			*entry = WADArchiveEntry(*o, o->GetSourceArchive());
-			//entry->SetSourceArchive(NULL);
+		}
+	}
+}
+
+void WADArchive::ResetOffsets() {
+	wxFileName wadFN(m_fileName);
+	if (wadFN.GetName().IsSameAs("HotlineMiami_GL", false))
+		m_format = FmtHM1;
+
+	wxFileInputStream iStr(m_fileName);
+
+	char fileId[5];
+	iStr.Read(fileId, 4);
+	fileId[4] = 0;
+	if (strcmp(fileId, "AGAR") == 0)
+	{
+		m_format = FmtHM2v2;
+
+		wxUint32 majorVer;
+		wxUint32 minorVer;
+		iStr.Read(&majorVer, sizeof(majorVer));
+		iStr.Read(&minorVer, sizeof(minorVer));
+		wxUint32 extHeaderSize;
+		iStr.Read(&extHeaderSize, sizeof(extHeaderSize));
+		iStr.SeekI(extHeaderSize, wxFromCurrent);
+	}
+	else
+		iStr.SeekI(0);
+
+	if (m_format == FmtHM1)
+	{
+		m_readOnly = true;
+
+		wxUint32 dataOffset;
+		iStr.Read(&dataOffset, sizeof(dataOffset));
+	}
+
+	wxUint32 fileCount;
+	iStr.Read(&fileCount, sizeof(fileCount));
+
+	for (size_t fileIndex = 0; fileIndex < fileCount; fileIndex++)
+	{
+		wxUint32 fileNameLength;
+		iStr.Read(&fileNameLength, sizeof(fileNameLength));
+
+		wxCharBuffer fnBuf(fileNameLength);
+		iStr.Read(fnBuf.data(), fileNameLength);
+		wxString fileName(fnBuf);
+
+		if (m_format != FmtHM1)
+		{
+			wxUint64 fileSize;
+			iStr.Read(&fileSize, sizeof(fileSize));
+
+			wxUint64 fileOffset;
+			iStr.Read(&fileOffset, sizeof(fileOffset));
+			if(m_entries[fileIndex].GetStatus() == WADArchiveEntry::EntryStatus::Entry_Original)
+				m_entries[fileIndex].SetOffset(fileOffset);
+		}
+		else
+		{
+			wxUint32 fileSize;
+			iStr.Read(&fileSize, sizeof(fileSize));
+
+			wxUint32 fileOffset;
+			iStr.Read(&fileOffset, sizeof(fileOffset));
+			if (m_entries[fileIndex].GetStatus() == WADArchiveEntry::EntryStatus::Entry_Original)
+				m_entries[fileIndex].SetOffset(fileOffset);
 		}
 	}
 }

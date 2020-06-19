@@ -33,7 +33,7 @@ void MergeDialog::OnRestoreClicked(wxCommandEvent& event)
 	
 	bool success = false;
 	
-	wxMessageDialog msgDlg(this, _("Are you sure you wan't to restore this file from the backup copy?"), _("Warning"), wxICON_WARNING | wxYES_NO);
+	wxMessageDialog msgDlg(this, _("Are you sure you want to restore this file from the backup copy?"), _("Warning"), wxICON_WARNING | wxYES_NO);
 	msgDlg.SetYesNoLabels(_("Restore"), _("Don't Restore"));
 	if (msgDlg.ShowModal() == wxID_YES)
 	{
@@ -115,4 +115,10 @@ wxString MergeDialog::GetBackupFileName() const
 {
 	wxString backupFileName = m_baseFilePicker->GetFileName().GetFullPath() + "_bkup";
 	return backupFileName;
+}
+
+
+void MergeDialog::OnUsePatchClicked(wxCommandEvent& event) {
+
+	//SetPatchWAD();
 }

@@ -29,6 +29,7 @@ public:
 	}
 	
 	void OnRestoreClicked(wxCommandEvent& event);
+	void OnUsePatchClicked(wxCommandEvent& event);
 	
 	bool TransferDataFromWindow();
 	
