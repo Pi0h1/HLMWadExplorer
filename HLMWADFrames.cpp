@@ -41,6 +41,10 @@ BaseExploreFrame::BaseExploreFrame( wxWindow* parent, wxWindowID id, const wxStr
 	wxMenuItem* openBaseWad;
 	openBaseWad = new wxMenuItem( m_fileMenu, ID_OPEN_BASE_WAD, wxString( _("Switch base wad...") ) , wxEmptyString, wxITEM_NORMAL );
 	m_fileMenu->Append( openBaseWad );
+
+	wxMenuItem* restoreBaseWad;
+	restoreBaseWad = new wxMenuItem(m_fileMenu, ID_RESTORE_BASE_WAD, wxString(_("Restore base wad...")), wxEmptyString, wxITEM_NORMAL);
+	m_fileMenu->Append(restoreBaseWad);
 	
 	m_fileMenu->AppendSeparator();
 	
@@ -55,6 +59,11 @@ BaseExploreFrame::BaseExploreFrame( wxWindow* parent, wxWindowID id, const wxStr
 	extract = new wxMenuItem( resource, ID_EXTRACT, wxString( _("&Extract...") ) + wxT('\t') + wxT("Ctrl+E"), wxEmptyString, wxITEM_NORMAL );
 	resource->Append( extract );
 	extract->Enable( false );
+
+	wxMenuItem* extractPAK;
+	extractPAK = new wxMenuItem(resource, ID_EXTRACT_PAK, wxString(_("&Extract PAK contents...")) + wxT('\t') + wxT("Ctrl+Q"), wxEmptyString, wxITEM_NORMAL);
+	resource->Append(extractPAK);
+	extractPAK->Enable(false);
 	
 	wxMenuItem* replace;
 	replace = new wxMenuItem( resource, ID_REPLACE, wxString( _("&Replace...") ) + wxT('\t') + wxT("Ctrl+R"), wxEmptyString, wxITEM_NORMAL );
@@ -172,8 +181,10 @@ BaseExploreFrame::BaseExploreFrame( wxWindow* parent, wxWindowID id, const wxStr
 	this->Connect( saveas->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( BaseExploreFrame::OnSaveAsClicked ) );
 	this->Connect( mergePatch->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( BaseExploreFrame::OnMergeClicked ) );
 	this->Connect( openBaseWad->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( BaseExploreFrame::OnSwitchBaseWadClicked ) );
+	this->Connect( restoreBaseWad->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler(BaseExploreFrame::OnRestoreClicked));
 	this->Connect( quit->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( BaseExploreFrame::OnQuitClicked ) );
 	this->Connect( extract->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( BaseExploreFrame::OnExtractClicked ) );
+	this->Connect( extractPAK->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler(BaseExploreFrame::OnExtractPAKClicked));
 	this->Connect( replace->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( BaseExploreFrame::OnReplaceClicked ) );
 	this->Connect( remove->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler(BaseExploreFrame::OnRemoveClicked));
 	this->Connect( add->GetId(), wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( BaseExploreFrame::OnAddClicked ) );
@@ -196,10 +207,12 @@ BaseExploreFrame::~BaseExploreFrame()
 	this->Disconnect( wxID_SAVEAS, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( BaseExploreFrame::OnSaveAsClicked ) );
 	this->Disconnect( ID_MERGE, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( BaseExploreFrame::OnMergeClicked ) );
 	this->Disconnect( ID_OPEN_BASE_WAD, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( BaseExploreFrame::OnSwitchBaseWadClicked ) );
+	this->Disconnect(ID_RESTORE_BASE_WAD, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler(BaseExploreFrame::OnRestoreClicked));
 	this->Disconnect( wxID_EXIT, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( BaseExploreFrame::OnQuitClicked ) );
 	this->Disconnect( ID_EXTRACT, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( BaseExploreFrame::OnExtractClicked ) );
+	this->Disconnect( ID_EXTRACT_PAK, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler(BaseExploreFrame::OnExtractPAKClicked));
 	this->Disconnect( ID_REPLACE, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( BaseExploreFrame::OnReplaceClicked ) );
-	this->Disconnect(ID_REMOVE, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler(BaseExploreFrame::OnRemoveClicked));
+	this->Disconnect( ID_REMOVE, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler(BaseExploreFrame::OnRemoveClicked));
 	this->Disconnect( wxID_ADD, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( BaseExploreFrame::OnAddClicked ) );
 	this->Disconnect( wxID_DELETE, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( BaseExploreFrame::OnDeleteClicked ) );
 	this->Disconnect( wxID_ABOUT, wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( BaseExploreFrame::OnAboutClicked ) );

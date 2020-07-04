@@ -60,6 +60,10 @@ public:
 	{
 		return m_size;
 	}
+	void SetSize(wxInt64 o) {
+		m_size = o;
+	}
+
 
 	wxInt64 GetOffset() const
 	{
@@ -230,7 +234,7 @@ public:
 	WADDirEntry* FindDir(const wxString& path, bool createOnDemand = false);
 	void SetOffset(wxFileOffset o) { m_dataOffset = o; };
 
-	wxFileOffset CalculateOffset() const;
+	void CalculateOffset();
 	void RemoveEntry(const WADArchiveEntry *e, const WADArchiveEntry *o);
 
 	void ResetOffsets();

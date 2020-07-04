@@ -13,11 +13,11 @@ MergeDialog::MergeDialog( wxWindow* parent ):
 	GetSizer()->SetMinSize(wxDLG_UNIT(this, wxSize(260, 60)));
 	m_sdbSizerOK->SetLabel(_("Merge"));
 	
-	wxHyperlinkCtrl* linkCtrl = new wxHyperlinkCtrl(this, wxID_ANY, _("Restore Base WAD"), "");
+	/*wxHyperlinkCtrl* linkCtrl = new wxHyperlinkCtrl(this, wxID_ANY, _("Restore Base WAD"), "");
 	m_sdbSizer->Insert(0, linkCtrl, wxSizerFlags().Center().Border());
 	m_sdbSizer->InsertSpacer(1, -1);
 	m_sdbSizer->Layout();
-	linkCtrl->Bind(wxEVT_COMMAND_HYPERLINK, &MergeDialog::OnRestoreClicked, this);
+	linkCtrl->Bind(wxEVT_COMMAND_HYPERLINK, &MergeDialog::OnRestoreClicked, this);*/
 	
 	Fit();
 	Center();

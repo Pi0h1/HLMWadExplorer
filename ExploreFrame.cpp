@@ -145,6 +145,8 @@ ExploreFrame::ExploreFrame( wxWindow* parent ):
 
 	m_menubar->Enable(ID_EXTRACT, false);
 	m_toolBar->EnableTool(ID_EXTRACT, false);
+	m_menubar->Enable(ID_EXTRACT_PAK, false);
+	m_toolBar->EnableTool(ID_EXTRACT_PAK, false);
 	m_menubar->Enable(wxID_SAVE, false);
 	m_toolBar->EnableTool(wxID_SAVE, false);
 	m_menubar->Enable(wxID_SAVEAS, false);
@@ -202,8 +204,9 @@ void ExploreFrame::OnAboutClicked( wxCommandEvent& event )
 	aboutInfo.SetName(wxTheApp->GetAppDisplayName());
 	aboutInfo.SetDescription(_("HLM Wad Extractor"));
 	aboutInfo.SetCopyright("(C) 2015-2016");
-	aboutInfo.SetWebSite("https://github.com/TcT2k/HLMWadExplorer");
+	aboutInfo.SetWebSite("https://github.com/muster128/HLMWadExplorer");
 	aboutInfo.AddDeveloper("Tobias Taschner");
+	aboutInfo.AddDeveloper("fixed by muster128");
 	aboutInfo.AddArtist("LightVelox");
 	aboutInfo.AddArtist("Everaldo Coelho");
 	aboutInfo.SetVersion(APP_VERSION);
@@ -496,6 +499,7 @@ void ExploreFrame::OnMergeClicked( wxCommandEvent& event )
 			{
 				wxLogInfo(_("Patch merged"));
 				m_archive->ResetOffsets();
+				m_original_archive = new WADArchive(m_archive->GetFileName());
 			}
 		}
 	}
@@ -639,13 +643,13 @@ void ExploreFrame::OnExtractClicked( wxCommandEvent& event )
 		wxASSERT(entry);
 
 		wxFileName fn(entry->GetFileName(), wxPATH_UNIX);
-		if (fn.GetExt().IsSameAs("pak", false) && !wxGetKeyState(WXK_SHIFT))
+		/*if (fn.GetExt().IsSameAs("pak", false) && !wxGetKeyState(WXK_SHIFT))
 		{
 			// Extract pak to single files
 			ExtractPak(entry);
 
 			return;
-		}
+		}*/
 
 		wxString fileName = fn.GetFullName();
 		wxFileDialog fileDlg(this, _("Select target for file extraction"), extractFolder, fileName, 
@@ -660,6 +664,11 @@ void ExploreFrame::OnExtractClicked( wxCommandEvent& event )
 
 		wxLogInfo(_("File extracted to %s"), fileDlg.GetPath());
 	}
+}
+
+void ExploreFrame::OnExtractPAKClicked(wxCommandEvent& event )
+{
+	ExtractPak(GetSelectedEntry());
 }
 
 void ExploreFrame::OnReplaceClicked( wxCommandEvent& event )
@@ -791,15 +800,15 @@ void ExploreFrame::OnFileListSelectionChanged( wxDataViewEvent& event )
 	m_toolBar->EnableTool(ID_EXTRACT, fileSelected || m_fileListCtrl->GetSelectedItemsCount() > 1);
 	m_menubar->Enable(wxID_DELETE, fileSelected && m_fileListCtrl->GetSelectedItemsCount() > 0 && !m_archive->GetReadOnly());
 	
-	if (fileSelected && entry->GetStatus() != WADArchiveEntry::Entry_Original) {
-		m_menubar->Enable(ID_REMOVE, true);
-	}
-	else {
-		m_menubar->Enable(ID_REMOVE, false);
-	}
 
-	if (m_fileListCtrl->GetSelectedItemsCount() != 1)
+	m_menubar->Enable(ID_REMOVE, fileSelected && entry->GetStatus() != WADArchiveEntry::Entry_Original);
+	
+
+	if (m_fileListCtrl->GetSelectedItemsCount() != 1) {
+		m_menubar->Enable(ID_EXTRACT_PAK, false);
 		return;
+	}
+		
 
 	wxBusyCursor busyCursor;
 
@@ -816,7 +825,7 @@ void ExploreFrame::OnFileListSelectionChanged( wxDataViewEvent& event )
 
 	wxFileName fn(entry->GetFileName(), wxPATH_UNIX);
 	wxString fileExt = fn.GetExt();
-
+	m_menubar->Enable(ID_EXTRACT_PAK, fileSelected && fileExt.IsSameAs("pak", false));
 	if (fileExt.IsSameAs("png", false) ||
 		fileExt.IsSameAs("jpg", false) ||
 		fileExt.IsSameAs("tga", false))
@@ -880,7 +889,9 @@ void ExploreFrame::OnFileListSelectionChanged( wxDataViewEvent& event )
 		m_archive->Extract(*entry, oStr);
 		wxMemoryInputStream iStr(oStr);
 		m_hexView->Load(iStr);
+		
 	}
+	
 }
 
 void ExploreFrame::OnFileListDoubleClick( wxMouseEvent& event )
@@ -919,3 +930,32 @@ void ExploreFrame::UpdateTitle()
 	SetTitle(newTitle);
 }
 
+void ExploreFrame::OnRestoreClicked(wxCommandEvent& event) {
+	OutputDebugStringA("Restore clicked!\n");
+	if (!wxFileExists(m_archive->GetFileName() + "_bkup"))
+	{
+		wxLogError(_("Backup file not found"));
+		return;
+	}
+
+	bool success = false;
+
+	wxMessageDialog msgDlg(this, _("Are you sure you want to restore this file from the backup copy?"), _("Warning"), wxICON_WARNING | wxYES_NO);
+	msgDlg.SetYesNoLabels(_("Restore"), _("Don't Restore"));
+	if (msgDlg.ShowModal() == wxID_YES)
+	{
+		wxBusyInfo busyInfo(_("Restoring from backup..."));
+		wxBusyCursor busyCursor;
+		if (!wxCopyFile(m_archive->GetFileName() + "_bkup", m_archive->GetFileName(), true))
+			wxLogError(_("Backup could not be restored"));
+		else
+			success = true;
+	}
+
+	if (success) {
+		wxMessageBox(_("Backup successfully restored"), _("Information"), wxICON_INFORMATION | wxOK, this);
+		m_archive->ResetOffsets();
+		m_original_archive = new WADArchive(m_archive->GetFileName());
+	}
+		
+}
