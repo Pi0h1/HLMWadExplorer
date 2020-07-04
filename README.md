@@ -14,7 +14,7 @@ Features
 
 Usage
 -----
-1. [Download](https://github.com/TcT2k/HLMWadExplorer/releases/latest) & install
+1. [Download](https://github.com/muster128/HLMWadExplorer/releases/latest) & install
 2. Start app
 3. Open WAD
 4. Extract or preview files
