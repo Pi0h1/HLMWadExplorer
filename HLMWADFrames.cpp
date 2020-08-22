@@ -303,6 +303,7 @@ BaseTexturePackPanel::BaseTexturePackPanel( wxWindow* parent, wxWindowID id, con
 	bSizer7->Add( m_staticText1, 0, wxALIGN_CENTER|wxALL, 5 );
 	
 	m_frameSpinCtrl = new wxSpinCtrl( m_panel4, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, wxSP_ARROW_KEYS|wxSP_WRAP|wxTE_PROCESS_ENTER, 0, 10, 0 );
+
 	bSizer7->Add( m_frameSpinCtrl, 0, wxALIGN_CENTER|wxALL, 5 );
 	
 	m_staticText2 = new wxStaticText( m_panel4, wxID_ANY, _("Background:"), wxDefaultPosition, wxDefaultSize, 0 );

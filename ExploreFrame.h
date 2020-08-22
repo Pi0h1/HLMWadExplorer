@@ -71,6 +71,8 @@ class ExploreFrame : public BaseExploreFrame
 	
 		const WADArchiveEntry* GetSelectedEntry() const;
 
+		const WADDirEntry* GetSelectedDir() const;
+
 		void OpenFile(const wxString& filename);
 
 		void UpdateTitle();

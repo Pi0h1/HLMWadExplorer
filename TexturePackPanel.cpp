@@ -11,7 +11,6 @@ TexturePackPanel::TexturePackPanel( wxWindow* parent )
 :
 BaseTexturePackPanel( parent )
 {
-
 }
 
 void TexturePackPanel::LoadTexture(wxInputStream& iStr, wxBitmap bitmap)
@@ -56,7 +55,6 @@ void TexturePackPanel::OnTextureListBoxSelected( wxCommandEvent& event )
 void TexturePackPanel::OnFrameSpinCtrlChanged(wxSpinEvent& event)
 {
 	UpdateFrameImage();
-
 	const Texture& tex = m_texturePack->at(m_textureListBox->GetSelection());
 	const Frame& frame = tex.at(m_frameSpinCtrl->GetValue());
 

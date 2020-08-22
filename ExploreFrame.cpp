@@ -12,6 +12,7 @@
 #include <wx/filedlg.h>
 #include <wx/filename.h>
 #include <wx/stdpaths.h>
+#include <wx/tokenzr.h>
 #include <wx/mstream.h>
 #include <wx/busyinfo.h>
 #include <wx/aboutdlg.h>
@@ -122,6 +123,7 @@ public:
 	bool GetAttr(const wxDataViewItem &item, unsigned int col, wxDataViewItemAttr &attr) const
 	{
 		WADDirEntry* dir = static_cast<WADDirEntry*>(item.GetID());
+		WADArchiveEntry * ent = dir->GetEntry();
 		if (dir->GetEntry() && dir->GetEntry()->GetStatus() != WADArchiveEntry::Entry_Original)
 			attr.SetBold(true);
 
@@ -246,9 +248,9 @@ void ExploreFrame::ApplyFilter(const wxString& filter)
 		return;
 
 	wxLogDebug("Applying filter: %s", filter);
-
-	if (!m_archive->ApplyFilter(filter))
-		wxLogError(_("No items found"));
+	m_archive->ApplyFilter(filter);
+	//if (!m_archive->ApplyFilter(filter))
+		//wxLogError(_("No items found"));
 
 	m_fileListCtrl->GetModel()->Cleared();
 	if (!m_archive->GetRootDir()->empty())
@@ -386,7 +388,8 @@ bool ExploreFrame::OpenBaseFile(bool forceSelection)
 	m_fileListCtrl->Refresh();
 	m_menubar->Enable(ID_EXTRACT, true);
 	m_toolBar->EnableTool(ID_EXTRACT, true);
-	m_menubar->Enable(wxID_ADD, !m_archive->GetReadOnly());
+	//m_menubar->Enable(wxID_ADD, !m_archive->GetReadOnly());
+	m_menubar->Enable(wxID_ADD, false);
 	if (!m_archive->GetRootDir()->empty())
 	{
 		SelectItem(NULL);
@@ -396,7 +399,7 @@ bool ExploreFrame::OpenBaseFile(bool forceSelection)
 	m_original_archive = new WADArchive(baseFileName.GetFullPath());
 
 	wxConfigBase::Get()->Write("BaseFile", baseFileName.GetFullPath());
-
+	UpdateTitle();
 	return true;
 }
 
@@ -522,14 +525,6 @@ bool ExploreFrame::CreatePatch()
 	if (patchCreated)
 	{
 		UpdateTitle();
-		/*wxMessageDialog msgDlg(this, _("The patch WAD has been saved\n\nDo you want to open the folder it was saved to?"), _("Information"), wxICON_INFORMATION | wxOK | wxCANCEL);
-		msgDlg.SetOKCancelLabels(_("Open Folder"), wxID_CLOSE);
-		if (msgDlg.ShowModal() == wxID_OK)
-		{
-			wxFileName patchFN(m_patchFileName);
-			patchFN.SetFullName("");
-			wxLaunchDefaultApplication(patchFN.GetFullPath());
-		}*/
 	}
 
 	return patchCreated;
@@ -542,6 +537,12 @@ const WADArchiveEntry* ExploreFrame::GetSelectedEntry() const
 		return dir->GetEntry();
 	else
 		return NULL;
+}
+
+const WADDirEntry* ExploreFrame::GetSelectedDir() const
+{
+	WADDirEntry* dir = static_cast<WADDirEntry*>(m_fileListCtrl->GetSelection().GetID());
+	return dir;
 }
 
 void ExploreFrame::ExtractPak(const WADArchiveEntry* entry)
@@ -609,10 +610,10 @@ void ExploreFrame::OnExtractClicked( wxCommandEvent& event )
 		return;
 	}
 
-	wxString extractFolder = wxStandardPaths::Get().GetDocumentsDir();
+	
 	if (m_fileListCtrl->GetSelectedItemsCount() > 1)
 	{
-		wxDirDialog dirDlg(this, _("Select folder to extract files to"), extractFolder, wxDD_DEFAULT_STYLE);
+		wxDirDialog dirDlg(this, _("Select folder to extract files to"), wxString(), wxDD_DEFAULT_STYLE);
 		if (dirDlg.ShowModal() == wxID_OK)
 		{
 			wxBusyInfo busyInfo(_("Extracting data..."));
@@ -634,7 +635,7 @@ void ExploreFrame::OnExtractClicked( wxCommandEvent& event )
 
 				if (!targetFileName.Mkdir(wxS_DIR_DEFAULT, wxPATH_MKDIR_FULL))
 					break;
-				m_archive->Extract(*entry, targetFileName.GetFullPath());
+				m_archive->Extract(*entry,targetFileName.GetFullPath());
 			}
 		}
 		wxLogInfo(_("Files extracted to %s"), dirDlg.GetPath());
@@ -643,16 +644,9 @@ void ExploreFrame::OnExtractClicked( wxCommandEvent& event )
 		wxASSERT(entry);
 
 		wxFileName fn(entry->GetFileName(), wxPATH_UNIX);
-		/*if (fn.GetExt().IsSameAs("pak", false) && !wxGetKeyState(WXK_SHIFT))
-		{
-			// Extract pak to single files
-			ExtractPak(entry);
-
-			return;
-		}*/
 
 		wxString fileName = fn.GetFullName();
-		wxFileDialog fileDlg(this, _("Select target for file extraction"), extractFolder, fileName, 
+		wxFileDialog fileDlg(this, _("Select target for file extraction"), wxString(), fileName, 
 			wxFileSelectorDefaultWildcardStr, wxFD_OVERWRITE_PROMPT | wxFD_SAVE);
 		if (fileDlg.ShowModal() == wxID_OK)
 		{
@@ -747,6 +741,19 @@ void ExploreFrame::OnRemoveClicked(wxCommandEvent& event) {
 
 void ExploreFrame::OnAddClicked( wxCommandEvent& event )
 {
+
+	WADDirEntry* dir = static_cast<WADDirEntry*>(m_fileListCtrl->GetSelection().GetID());
+	
+	FolderWADDirEntry *folderDir = dynamic_cast<FolderWADDirEntry *>(dir);
+
+	//Note: Adding currently breaks everything. Fix it.
+	if (!folderDir) {
+		wxMessageDialog msgDlg(this, wxString::Format(_("Please select a directory prior to adding."), 0), _("Warning"), wxICON_WARNING | wxOK);
+		if (msgDlg.ShowModal() == wxID_OK) {
+			return;
+		}
+	}
+
 	wxFileDialog fileDlg(this, _("Select file to add"), wxString(), wxString(), "*.*", wxFD_DEFAULT_STYLE | wxFD_FILE_MUST_EXIST);
 	if (fileDlg.ShowModal() == wxID_OK)
 	{
@@ -761,8 +768,17 @@ void ExploreFrame::OnAddClicked( wxCommandEvent& event )
 			entry.SetStatus(WADArchiveEntry::Entry_Added);
 			m_archive->Add(entry);
 			// TODO: replace
-			//static_cast<FileDataModel*>(m_fileListCtrl->GetModel())->RowAppended();
-
+			//m_fileListCtrl->GetModel()->ItemAdded(wxDataViewItem(dir), wxDataViewItem(folderDir->AddFile(&entry)));
+			//folderDir->AddFile(&entry);
+			//m_fileListCtrl->GetModel()->ItemAdded(wxDataViewItem(dir), wxDataViewItem(folderDir->AddFile(&entry)));
+			//m_fileListCtrl->GetModel()->ItemChanged(wxDataViewItem(dir));
+			
+			/*static_cast<FileDataModel*>(m_fileListCtrl->GetModel())->ItemAdded(wxDataViewItem(dir), wxDataViewItem(folderDir->AddFile(&entry)));
+			wxObjectDataPtr<FileDataModel> model(new FileDataModel(m_archive.get()));
+			m_fileListCtrl->UnselectAll();
+			m_fileListCtrl->AssociateModel(model.get());
+			m_fileListCtrl->Refresh();
+			m_fileListCtrl->SetFocus();*/
 			UpdateTitle();
 		}
 	}
@@ -794,7 +810,9 @@ void ExploreFrame::OnQuitClicked( wxCommandEvent& event )
 void ExploreFrame::OnFileListSelectionChanged( wxDataViewEvent& event )
 {
 	const WADArchiveEntry* entry = GetSelectedEntry();
+	const WADDirEntry* di = GetSelectedDir();
 	bool fileSelected = (entry != NULL);
+	bool dirSelected = (di != NULL);
 	m_menubar->Enable(ID_REPLACE, fileSelected && m_fileListCtrl->GetSelectedItemsCount() > 0 && !m_archive->GetReadOnly());
 	m_menubar->Enable(ID_EXTRACT, fileSelected || m_fileListCtrl->GetSelectedItemsCount() > 1);
 	m_toolBar->EnableTool(ID_EXTRACT, fileSelected || m_fileListCtrl->GetSelectedItemsCount() > 1);
@@ -897,6 +915,7 @@ void ExploreFrame::OnFileListSelectionChanged( wxDataViewEvent& event )
 void ExploreFrame::OnFileListDoubleClick( wxMouseEvent& event )
 {
 // TODO: Implement OnFileListDoubleClick
+	const WADDirEntry* di = GetSelectedDir();
 }
 
 void ExploreFrame::UpdateTitle()
@@ -924,8 +943,20 @@ void ExploreFrame::UpdateTitle()
 		wxFileName archiveFN(m_patchFileName);
 		newTitle += wxString::Format("%s - %s", archiveFN.GetName(), wxTheApp->GetAppDisplayName());
 	} 
-	else
+	else {
 		newTitle += wxTheApp->GetAppDisplayName();
+	}
+		
+	if (m_archive) {
+		newTitle += " - ";
+		wxStringTokenizer tokenizer(m_archive->GetFileName(), "\\");
+		wxString fName;
+		while (tokenizer.HasMoreTokens())
+		{
+			fName = tokenizer.GetNextToken();
+		}
+		newTitle += fName;
+	}
 
 	SetTitle(newTitle);
 }

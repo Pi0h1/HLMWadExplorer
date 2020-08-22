@@ -138,6 +138,9 @@ public:
 	{
 		return m_parent;
 	}
+	void SetParent(WADDirEntry *p) {
+		m_parent = p;
+	}
 
 	bool empty() const
 	{
@@ -154,6 +157,136 @@ protected:
 private:
 	WADDirEntry* m_parent;
 };
+
+
+//
+// FileWADDirEntry
+//
+class FileWADDirEntry : public WADDirEntry
+{
+public:
+	FileWADDirEntry(WADDirEntry* parent, WADArchiveEntry* entry) :
+		WADDirEntry(parent)
+	{
+		m_entry = entry;
+		wxFileName fn(entry->GetFileName());
+		m_name = fn.GetFullName();
+	}
+
+	virtual bool IsContainer() const override
+	{
+		return false;
+	}
+
+	virtual size_t GetChildCount() const override
+	{
+		return 0;
+	}
+
+	virtual WADDirEntry* GetChild(size_t index) const override
+	{
+		return NULL;
+	}
+
+	virtual WADArchiveEntry* GetEntry() const override
+	{
+		return m_entry;
+	}
+
+private:
+	WADArchiveEntry* m_entry;
+};
+
+//
+// PakWADDirEntry
+//
+class PakWADDirEntry : public FileWADDirEntry
+{
+public:
+	PakWADDirEntry(WADDirEntry* parent, WADArchiveEntry* entry) :
+		FileWADDirEntry(parent, entry)
+	{
+
+	}
+
+	virtual bool IsContainer() const override
+	{
+		// TODO: return true after implementing parsing
+		return false;
+	}
+
+	virtual size_t GetChildCount() const override
+	{
+		// TODO: enumerate sub entries
+		return 0;
+	}
+
+	virtual WADDirEntry* GetChild(size_t index) const override
+	{
+		return NULL;
+	}
+
+private:
+
+};
+
+//
+// FolderWADDirEntry
+//
+class FolderWADDirEntry : public WADDirEntry
+{
+public:
+	FolderWADDirEntry(WADDirEntry* parent, const wxString& name) :
+		WADDirEntry(parent)
+	{
+		m_name = name;
+	}
+
+	virtual bool IsContainer() const override
+	{
+		return true;
+	}
+
+	virtual size_t GetChildCount() const override
+	{
+		return m_entries.size();
+	}
+
+	virtual WADDirEntry* GetChild(size_t index) const override
+	{
+		return m_entries[index].get();
+	}
+
+	virtual WADArchiveEntry* GetEntry() const override
+	{
+		return NULL;
+	}
+
+	WADDirEntry* AddFolder(const wxString& name)
+	{
+		wxSharedPtr<WADDirEntry> folder(new FolderWADDirEntry(this, name));
+		m_entries.push_back(folder);
+		return folder.get();
+	}
+
+	WADDirEntry* AddFile(WADArchiveEntry* entry)
+	{
+		wxFileName fn(entry->GetFileName());
+		WADDirEntry* subDir;
+		if (fn.GetExt().IsSameAs("pak", false))
+			subDir = new PakWADDirEntry(this, entry);
+		else
+			subDir = new FileWADDirEntry(this, entry);
+
+		wxSharedPtr<WADDirEntry> folder(subDir);
+		m_entries.push_back(folder);
+		return folder.get();
+	}
+
+private:
+	wxVector< wxSharedPtr<WADDirEntry> > m_entries;
+};
+
 
 class WADArchive
 {

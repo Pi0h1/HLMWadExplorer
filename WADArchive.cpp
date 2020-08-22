@@ -11,134 +11,10 @@
 #include <wx/wfstream.h>
 #include <wx/mstream.h>
 
-//
-// FileWADDirEntry
-//
 
-class FileWADDirEntry : public WADDirEntry
-{
-public:
-	FileWADDirEntry(WADDirEntry* parent, WADArchiveEntry* entry):
-		WADDirEntry(parent)
-	{
-		m_entry = entry;
-		wxFileName fn(entry->GetFileName());
-		m_name = fn.GetFullName();
-	}
-	
-	virtual bool IsContainer() const override
-	{
-		return false;
-	}
 
-	virtual size_t GetChildCount() const override
-	{
-		return 0;
-	}
 
-	virtual WADDirEntry* GetChild(size_t index) const override
-	{
-		return NULL;
-	}
 
-	virtual WADArchiveEntry* GetEntry() const override
-	{
-		return m_entry;
-	}
-
-private:
-	WADArchiveEntry* m_entry;
-};
-
-//
-// PakWADDirEntry
-//
-class PakWADDirEntry : public FileWADDirEntry
-{
-public:
-	PakWADDirEntry(WADDirEntry* parent, WADArchiveEntry* entry):
-		FileWADDirEntry(parent, entry)
-	{
-		
-	}
-	
-	virtual bool IsContainer() const override
-	{
-		// TODO: return true after implementing parsing
-		return false;
-	}
-	
-	virtual size_t GetChildCount() const override
-	{
-		// TODO: enumerate sub entries
-		return 0;
-	}
-	
-	virtual WADDirEntry* GetChild(size_t index) const override
-	{
-		return NULL;
-	}
-	
-private:
-	
-};
-
-//
-// FolderWADDirEntry
-//
-class FolderWADDirEntry : public WADDirEntry
-{
-public:
-	FolderWADDirEntry(WADDirEntry* parent, const wxString& name):
-		WADDirEntry(parent)
-	{
-		m_name = name;
-	}
-
-	virtual bool IsContainer() const override
-	{
-		return true;
-	}
-	
-	virtual size_t GetChildCount() const override
-	{
-		return m_entries.size();
-	}
-
-	virtual WADDirEntry* GetChild(size_t index) const override
-	{
-		return m_entries[index].get();
-	}
-
-	virtual WADArchiveEntry* GetEntry() const override
-	{
-		return NULL;
-	}
-
-	WADDirEntry* AddFolder(const wxString& name)
-	{
-		wxSharedPtr<WADDirEntry> folder(new FolderWADDirEntry(this, name));
-		m_entries.push_back(folder);
-		return folder.get();
-	}
-
-	WADDirEntry* AddFile(WADArchiveEntry* entry)
-	{
-		wxFileName fn(entry->GetFileName());
-		WADDirEntry* subDir;
-		if (fn.GetExt().IsSameAs("pak",false))
-			subDir = new PakWADDirEntry(this, entry);
-		else
-			subDir = new FileWADDirEntry(this, entry);
-		
-		wxSharedPtr<WADDirEntry> folder(subDir);
-		m_entries.push_back(folder);
-		return folder.get();
-	}
-
-private:
-	wxVector< wxSharedPtr<WADDirEntry> > m_entries;
-};
 
 //
 // WADDirEntry
@@ -375,7 +251,13 @@ wxBitmap WADArchive::ExtractBitmap(const WADArchiveEntry& entry)
 
 	wxStreamBuffer* buffer = oStr.GetOutputStreamBuffer();
 	wxMemoryInputStream iStr(buffer->GetBufferStart(), buffer->GetBufferSize());
+
+
 	wxImage img(iStr);
+	
+
+	if (img.HasAlpha()) OutputDebugStringA("Has alpha!\n");
+	else OutputDebugStringA("Does not have alpha!\n");
 
 	if (!img.IsOk())
 		return wxNullBitmap;
@@ -612,7 +494,7 @@ bool WADArchive::ApplyFilter(const wxString& filter)
 	if (!m_rootDir->GetChildCount())
 	{
 		// Reset filter
-		ApplyFilter("");
+		//ApplyFilter("");
 
 		return false;
 	} else
