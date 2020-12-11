@@ -8,12 +8,12 @@
 
 #include "ExploreFrame.h"
 
+
 #include <wx/app.h>
 #include <wx/filedlg.h>
 #include <wx/filename.h>
 #include <wx/stdpaths.h>
 #include <wx/tokenzr.h>
-#include <wx/mstream.h>
 #include <wx/busyinfo.h>
 #include <wx/aboutdlg.h>
 #include <wx/textdlg.h>
@@ -29,6 +29,7 @@
 #include "TexturePack.h"
 #include "TexturePackPanel.h"
 #include "StringTablePanel.h"
+#include "PAKPanel.h"
 #include "MergeDialog.h"
 #include "VersionInfo.h"
 #include "HexView.h"
@@ -123,9 +124,9 @@ public:
 	bool GetAttr(const wxDataViewItem &item, unsigned int col, wxDataViewItemAttr &attr) const
 	{
 		WADDirEntry* dir = static_cast<WADDirEntry*>(item.GetID());
-		WADArchiveEntry * ent = dir->GetEntry();
-		if (dir->GetEntry() && dir->GetEntry()->GetStatus() != WADArchiveEntry::Entry_Original)
-			attr.SetBold(true);
+		attr.SetBold(dir->isDirty());
+		
+		
 
 		return true;
 	}
@@ -177,6 +178,7 @@ ExploreFrame::ExploreFrame( wxWindow* parent ):
 	m_previewBookCtrl->AddPage(new TexturePackPanel(m_previewBookCtrl), "Texture", false);
 	m_previewBookCtrl->AddPage(new TextPanel(m_previewBookCtrl), "Text", false);
 	m_previewBookCtrl->AddPage(new StringTablePanel(m_previewBookCtrl), "String Table", false);
+	m_previewBookCtrl->AddPage(new PAKPanel(m_previewBookCtrl), "PAK", false);
 
 	Bind(wxEVT_MENU, &ExploreFrame::OnRecentFileClicked, this, wxID_FILE1, wxID_FILE9);
 
@@ -234,7 +236,7 @@ void ExploreFrame::OnSearchCtrlEnter(wxCommandEvent& event)
 	if (m_searchTimer.IsRunning())
 		m_searchTimer.Stop();
 
-	ApplyFilter(m_searchCtrl->GetValue());
+	ApplyFilter(m_searchCtrl->GetValue(), m_searchBox->GetValue());
 }
 
 void ExploreFrame::OnSearchTimer(wxTimerEvent& event)
@@ -242,13 +244,13 @@ void ExploreFrame::OnSearchTimer(wxTimerEvent& event)
 	ApplyFilter(m_searchCtrl->GetValue());
 }
 
-void ExploreFrame::ApplyFilter(const wxString& filter)
+void ExploreFrame::ApplyFilter(const wxString& filter, bool onlyModified)
 {
 	if (!m_archive || m_ignoreSearch)
 		return;
 
 	wxLogDebug("Applying filter: %s", filter);
-	m_archive->ApplyFilter(filter);
+	m_archive->ApplyFilter(filter, onlyModified);
 	//if (!m_archive->ApplyFilter(filter))
 		//wxLogError(_("No items found"));
 
@@ -545,61 +547,75 @@ const WADDirEntry* ExploreFrame::GetSelectedDir() const
 	return dir;
 }
 
-void ExploreFrame::ExtractPak(const WADArchiveEntry* entry)
+// I'm assuming that a root pak can only have paks that don't have child paks
+// In other words, paks can have children, but no grandchildren
+void ExploreFrame::ExtractPak(wxMemoryOutputStream &oStr, wxFileName &folder, int size, int depth)
 {
-	wxString extractFolder = wxStandardPaths::Get().GetDocumentsDir();
-	wxDirDialog dirDlg(this, _("Select folder to PAK file contents to"), extractFolder, wxDD_DEFAULT_STYLE);
-	if (dirDlg.ShowModal() == wxID_OK)
+	
+	wxMemoryInputStream iStr(oStr);
+	wxUint32 fileCount;
+	iStr.Read(&fileCount, sizeof(fileCount));
+	wxLogDebug("%d files in PAK", fileCount);
+
+	wxLogDebug(folder.GetFullPath());
+
+	wxVector<wxUint32> offsets;
+	offsets.reserve(fileCount);
+	for (int i = 0; i < fileCount; ++i)
 	{
-		extractFolder = dirDlg.GetPath();
-		wxMemoryOutputStream oStr;
-		m_archive->Extract(*entry, oStr);
-		wxMemoryInputStream iStr(oStr);
-		wxUint32 fileCount;
-		iStr.Read(&fileCount, sizeof(fileCount));
-		wxLogDebug("%d files in PAK", fileCount);
+		wxUint32 offset;
+		iStr.Read(&offset, sizeof(offset));
+		wxLogDebug("%d: %d", i, offset);
+		offsets.push_back(offset);
+	}
+	offsets.push_back(size);
 
-		wxFileName pakFN(entry->GetFileName(), wxPATH_UNIX);
+	char* rawData = new char[size];
+	oStr.CopyTo(rawData, size);
 
-		// Create base extraction path
-		wxFileName extFolder(extractFolder, "");
-		extFolder.AppendDir(pakFN.GetName() + "_expak");
-		extFolder.Mkdir(wxS_DIR_DEFAULT, wxPATH_MKDIR_FULL);
+	iStr.SeekI(offsets[0]);
 
-		wxVector<wxUint32> offsets;
-		offsets.reserve(fileCount);
-		for (int i = 0; i < fileCount; ++i)
-		{
-			wxUint32 offset;
-			iStr.Read(&offset, sizeof(offset));
-			wxLogDebug("%d: %d", i, offset);
-			offsets.push_back(offset);
+	// Extract files
+	for (int i = 0; i < fileCount; ++i)
+	{
+		wxString name = wxString::Format("%d", i);
+		wxFileName dataFN(folder.GetFullPath(), name);
+
+		wxCharBuffer entryNameBuf(offsets[i + 1] - offsets[i]);
+		iStr.Read(entryNameBuf.data(), offsets[i + 1] - offsets[i]);
+
+		wxMemoryInputStream mis(entryNameBuf.data(), entryNameBuf.length());
+
+		if (depth < 1 && isPak(mis)) {
+			wxString stringnumber = wxString::Format(wxT("%d"), (int)i);
+			wxFileName pakFN(stringnumber, wxPATH_UNIX);
+			wxFileName subPakFolder(folder.GetFullPath(), "");
+			subPakFolder.AppendDir(pakFN.GetName());
+			subPakFolder.Mkdir(wxS_DIR_DEFAULT, wxPATH_MKDIR_FULL);
+
+			wxMemoryOutputStream mos(entryNameBuf.data(), entryNameBuf.length());
+			
+			ExtractPak(mos, subPakFolder, entryNameBuf.length(), depth + 1);
 		}
-		offsets.push_back(entry->GetSize());
-
-		char* rawData = new char[entry->GetSize()];
-		oStr.CopyTo(rawData, entry->GetSize());
-
-		// Extract files
-		for (int i = 0; i < fileCount; ++i)
-		{
-			wxString name = wxString::Format("%d", i);
-			wxFileName dataFN(extFolder.GetFullPath(), name);
+		else {
+			wxLogNull logNo;
+			//mis.SeekI(0);
+			wxImage img(mis, wxBITMAP_TYPE_TGA);
+			if (img.IsOk()) {
+				dataFN.SetExt("tga");
+			}
 
 			wxTempFileOutputStream fileStr(dataFN.GetFullPath());
 			fileStr.Write(&rawData[offsets[i]],
 				offsets[i + 1] - offsets[i]);
-
+			
 			fileStr.Commit();
 		}
-
-		delete[] rawData;
-
-		wxMessageDialog msgDlg(this, _("The PAK contents have been extracted\n\nDo you want to open the folder it was extracted to?"), _("Information"), wxICON_INFORMATION | wxOK | wxCANCEL);
-		msgDlg.SetOKCancelLabels(_("Open Folder"), wxID_CLOSE);
-		if (msgDlg.ShowModal() == wxID_OK)
-			wxLaunchDefaultApplication(extFolder.GetFullPath());
+		
 	}
+
+	delete[] rawData;
+
 }
 
 void ExploreFrame::OnExtractClicked( wxCommandEvent& event )
@@ -662,7 +678,32 @@ void ExploreFrame::OnExtractClicked( wxCommandEvent& event )
 
 void ExploreFrame::OnExtractPAKClicked(wxCommandEvent& event )
 {
-	ExtractPak(GetSelectedEntry());
+	const WADArchiveEntry *entry = GetSelectedEntry();
+	wxString extractFolder = wxStandardPaths::Get().GetDocumentsDir();
+	wxDirDialog dirDlg(this, _("Select folder to PAK file contents to"), extractFolder, wxDD_DEFAULT_STYLE);
+	if (dirDlg.ShowModal() == wxID_OK)
+	{
+		extractFolder = dirDlg.GetPath();
+		
+		wxFileName pakFN(entry->GetFileName(), wxPATH_UNIX);
+
+		// Create base extraction path
+		wxFileName extFolder(extractFolder, "");
+		extFolder.AppendDir(pakFN.GetName() + "_expak");
+		extFolder.Mkdir(wxS_DIR_DEFAULT, wxPATH_MKDIR_FULL);
+
+
+		wxMemoryOutputStream oStr;
+		m_archive->Extract(*entry, oStr);
+
+		ExtractPak(oStr, extFolder, entry->GetSize(), 0);
+
+		wxMessageDialog msgDlg(this, _("The PAK contents have been extracted\n\nDo you want to open the folder it was extracted to?"), _("Information"), wxICON_INFORMATION | wxOK | wxCANCEL);
+		msgDlg.SetOKCancelLabels(_("Open Folder"), wxID_CLOSE);
+		if (msgDlg.ShowModal() == wxID_OK)
+			wxLaunchDefaultApplication(extFolder.GetFullPath());
+	}
+	//ExtractPak(GetSelectedEntry());
 }
 
 void ExploreFrame::OnReplaceClicked( wxCommandEvent& event )
@@ -889,6 +930,7 @@ void ExploreFrame::OnFileListSelectionChanged( wxDataViewEvent& event )
 #endif
 		textPanel->m_textCtrl->SetValue(text);
 	}
+	
 	else if (fn.GetName().IsSameAs("hlm2_localization"))
 	{
 		m_previewBookCtrl->ChangeSelection(4);
@@ -898,6 +940,20 @@ void ExploreFrame::OnFileListSelectionChanged( wxDataViewEvent& event )
 		m_archive->Extract(*entry, oStr);
 		wxStreamBuffer* buffer = oStr.GetOutputStreamBuffer();
 		stringPanel->LoadStringTable(buffer->GetBufferStart(), buffer->GetBufferSize());
+	}
+	else if (fileExt.IsSameAs("pak", false))
+	{
+
+		m_previewBookCtrl->ChangeSelection(5);
+
+		wxMemoryOutputStream oStr;
+		m_archive->Extract(*entry, oStr);
+		wxStreamBuffer* buffer = oStr.GetOutputStreamBuffer();
+		wxMemoryInputStream iStr(buffer->GetBufferStart(), buffer->GetBufferSize());
+
+		
+		PAKPanel* pakPanel = (PAKPanel*)m_previewBookCtrl->GetCurrentPage();
+		pakPanel->LoadPAK(iStr, entry->GetSize());
 	}
 	else
 	{
@@ -990,3 +1046,105 @@ void ExploreFrame::OnRestoreClicked(wxCommandEvent& event) {
 	}
 		
 }
+
+bool ExploreFrame::isPak(wxInputStream &in) {
+	wxUint32 fileCount;
+	in.Read(&fileCount, sizeof(fileCount));
+	if (fileCount > 255 || fileCount <= 0) {
+		in.SeekI(0);
+		return false;
+	}
+	wxVector<wxUint32> offsets;
+	offsets.reserve(fileCount);
+	for (int i = 0; i < fileCount; ++i)
+	{
+		wxUint32 offset;
+		in.Read(&offset, sizeof(offset));
+
+		if (offset < 0) {
+			in.SeekI(0);
+			return false;
+		}
+
+		if (i > 0 && offset < offsets[i - 1]) {
+			in.SeekI(0);
+			return false;
+		}
+
+		offsets.push_back(offset);
+
+	}
+	if (offsets[0] % 16 != 0) {
+		in.SeekI(0);
+		return false;
+	}
+	in.SeekI(0);
+	return true;
+
+}
+
+
+/*
+void ExploreFrame::ExtractPak(const WADArchiveEntry* entry)
+{
+	wxString extractFolder = wxStandardPaths::Get().GetDocumentsDir();
+	wxDirDialog dirDlg(this, _("Select folder to PAK file contents to"), extractFolder, wxDD_DEFAULT_STYLE);
+	if (dirDlg.ShowModal() == wxID_OK)
+	{
+		extractFolder = dirDlg.GetPath();
+		wxMemoryOutputStream oStr;
+		m_archive->Extract(*entry, oStr);
+		wxMemoryInputStream iStr(oStr);
+		wxUint32 fileCount;
+		iStr.Read(&fileCount, sizeof(fileCount));
+		wxLogDebug("%d files in PAK", fileCount);
+
+		wxFileName pakFN(entry->GetFileName(), wxPATH_UNIX);
+
+		// Create base extraction path
+		wxFileName extFolder(extractFolder, "");
+		extFolder.AppendDir(pakFN.GetName() + "_expak");
+		extFolder.Mkdir(wxS_DIR_DEFAULT, wxPATH_MKDIR_FULL);
+
+		wxVector<wxUint32> offsets;
+		offsets.reserve(fileCount);
+		for (int i = 0; i < fileCount; ++i)
+		{
+			wxUint32 offset;
+			iStr.Read(&offset, sizeof(offset));
+			wxLogDebug("%d: %d", i, offset);
+			offsets.push_back(offset);
+		}
+		offsets.push_back(entry->GetSize());
+
+		char* rawData = new char[entry->GetSize()];
+		oStr.CopyTo(rawData, entry->GetSize());
+
+		// Extract files
+		for (int i = 0; i < fileCount; ++i)
+		{
+			wxString name = wxString::Format("%d", i);
+			wxFileName dataFN(extFolder.GetFullPath(), name);
+
+			wxTempFileOutputStream fileStr(dataFN.GetFullPath());
+			fileStr.Write(&rawData[offsets[i]],
+				offsets[i + 1] - offsets[i]);
+
+			fileStr.Commit();
+		}
+
+		delete[] rawData;
+
+		wxMessageDialog msgDlg(this, _("The PAK contents have been extracted\n\nDo you want to open the folder it was extracted to?"), _("Information"), wxICON_INFORMATION | wxOK | wxCANCEL);
+		msgDlg.SetOKCancelLabels(_("Open Folder"), wxID_CLOSE);
+		if (msgDlg.ShowModal() == wxID_OK)
+			wxLaunchDefaultApplication(extFolder.GetFullPath());
+	}
+}
+
+
+void ExploreFrame::OnExtractPAKClicked(wxCommandEvent& event )
+{
+	ExtractPak(GetSelectedEntry());
+}
+*/

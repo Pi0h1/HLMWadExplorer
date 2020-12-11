@@ -129,6 +129,8 @@ public:
 
 	virtual WADArchiveEntry* GetEntry() const = 0;
 
+	virtual bool isDirty() const = 0;
+
 	const wxString& GetName() const
 	{
 		return m_name;
@@ -150,6 +152,10 @@ public:
 	wxString GetPath() const;
 
 	size_t GetDirCount() const;
+
+	bool hasModifiedChild = false;
+
+	
 
 protected:
 	wxString m_name;
@@ -191,6 +197,11 @@ public:
 	virtual WADArchiveEntry* GetEntry() const override
 	{
 		return m_entry;
+	}
+
+	virtual bool isDirty() const override {
+		if (m_entry->GetStatus() != WADArchiveEntry::Entry_Original) return true;
+		else return false;
 	}
 
 private:
@@ -260,6 +271,13 @@ public:
 	virtual WADArchiveEntry* GetEntry() const override
 	{
 		return NULL;
+	}
+
+	virtual bool isDirty() const override{
+		for (int i = 0; i < GetChildCount(); i++) {
+			if (m_entries[i]->isDirty()) return true;
+		}
+		return false;
 	}
 
 	WADDirEntry* AddFolder(const wxString& name)
@@ -355,7 +373,7 @@ public:
 	}
 
 	/// Returns false if no entries matched the filter
-	bool ApplyFilter(const wxString& filter);
+	bool ApplyFilter(const wxString& filter, bool onlyModified = false);
 
 	WADDirEntry* GetRootDir() const
 	{

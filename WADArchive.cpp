@@ -471,7 +471,7 @@ void WADArchive::Replace(WADDirEntry* dir, const wxString& sourceFileName)
 	m_modified = true;
 }
 
-bool WADArchive::ApplyFilter(const wxString& filter)
+bool WADArchive::ApplyFilter(const wxString& filter, bool onlyModified)
 {
 	m_rootDir.reset(new FolderWADDirEntry(NULL, ""));
 
@@ -481,8 +481,9 @@ bool WADArchive::ApplyFilter(const wxString& filter)
 
 	for (auto entry = m_entries.begin(); entry != m_entries.end(); ++entry)
 	{
-		if (lowerFilter.empty() ||
-			entry->GetFileName().Lower().Find(lowerFilter) != wxNOT_FOUND)
+		if ((lowerFilter.empty() ||
+			entry->GetFileName().Lower().Find(lowerFilter) != wxNOT_FOUND) &&
+			(!onlyModified || entry->GetStatus() != WADArchiveEntry::Entry_Original))
 		{
 			WADDirEntry* dir = FindDir(entry->GetFileName(), true);
 			static_cast<FolderWADDirEntry*>(dir)->AddFile(entry);
@@ -732,112 +733,3 @@ void WADArchive::ResetOffsets() {
 	}
 }
 
-/*wxFileOffset WADArchive::CalculateOffset() const {
-	wxFileOffset myOffset;
-	wxFileName wadFN(m_fileName);
-
-	wxFileInputStream iStr(m_fileName);
-
-	char fileId[5];
-	iStr.Read(fileId, 4);
-	fileId[4] = 0;
-	if (strcmp(fileId, "AGAR") == 0)
-	{
-
-		wxUint32 majorVer;
-		wxUint32 minorVer;
-		iStr.Read(&majorVer, sizeof(majorVer));
-		iStr.Read(&minorVer, sizeof(minorVer));
-		wxUint32 extHeaderSize;
-		iStr.Read(&extHeaderSize, sizeof(extHeaderSize));
-		iStr.SeekI(extHeaderSize, wxFromCurrent);
-	}
-	else
-		iStr.SeekI(0);
-
-	if (m_format == FmtHM1)
-	{
-
-		wxUint32 dataOffset;
-		iStr.Read(&dataOffset, sizeof(dataOffset));
-
-		myOffset = dataOffset;
-	}
-
-	wxUint32 fileCount;
-	iStr.Read(&fileCount, sizeof(fileCount));
-	wxLogDebug("Found %d files in wad: %s", fileCount, m_fileName);
-
-	//m_entries.reserve(fileCount);
-
-	for (size_t fileIndex = 0; fileIndex < fileCount; fileIndex++)
-	{
-		wxUint32 fileNameLength;
-		iStr.Read(&fileNameLength, sizeof(fileNameLength));
-
-		wxCharBuffer fnBuf(fileNameLength);
-		iStr.Read(fnBuf.data(), fileNameLength);
-		wxString fileName(fnBuf);
-
-		if (m_format != FmtHM1)
-		{
-			wxUint64 fileSize;
-			iStr.Read(&fileSize, sizeof(fileSize));
-
-			wxUint64 fileOffset;
-			iStr.Read(&fileOffset, sizeof(fileOffset));
-
-		}
-		else
-		{
-			wxUint32 fileSize;
-			iStr.Read(&fileSize, sizeof(fileSize));
-
-			wxUint32 fileOffset;
-			iStr.Read(&fileOffset, sizeof(fileOffset));
-
-		}
-	}
-
-	if (m_format == FmtHM2v2)
-	{
-		// Parse directory table (currently unused but required to determine data offset)
-		wxUint32 dirCount;
-		iStr.Read(&dirCount, sizeof(dirCount));
-		for (int dirIndex = 0; dirIndex < dirCount; dirIndex++)
-		{
-			wxUint32 dirNameLength;
-			iStr.Read(&dirNameLength, sizeof(dirNameLength));
-
-			if (dirNameLength)
-			{
-				wxCharBuffer dirNameBuf(dirNameLength);
-				iStr.Read(dirNameBuf.data(), dirNameLength);
-				wxString dirName(dirNameBuf);
-			}
-
-			// Parse directory
-			wxUint32 entryCount;
-			iStr.Read(&entryCount, sizeof(entryCount));
-
-			for (int entryIndex = 0; entryIndex < entryCount; entryIndex++)
-			{
-				wxUint32 entryNameLength;
-				iStr.Read(&entryNameLength, sizeof(entryNameLength));
-
-				wxCharBuffer entryNameBuf(entryNameLength);
-				iStr.Read(entryNameBuf.data(), entryNameLength);
-				wxString entryName(entryNameBuf);
-
-				wxUint8 entryType;
-				iStr.Read(&entryType, sizeof(entryType));
-
-			}
-		}
-	}
-
-	if (m_format != FmtHM1)
-		myOffset = iStr.SeekI(0, wxFromCurrent);
-
-	return myOffset;
-}*/

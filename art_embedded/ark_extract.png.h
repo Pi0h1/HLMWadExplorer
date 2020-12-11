@@ -5,7 +5,7 @@
 #include <wx/image.h>
 #include <wx/bitmap.h>
 
-static const unsigned char ark_extract_png[] = 
+static const unsigned char ark_extract_png[] =
 {
 	0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 
 	0x00, 0x0D, 0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x16, 
@@ -132,7 +132,7 @@ wxBitmap& ark_extract_png_to_wx_bitmap()
 	static wxImage image( memIStream, wxBITMAP_TYPE_PNG );
 	static wxBitmap bmp( image );
 	return bmp;
-};
+}
 
 
 #endif //ARK_EXTRACT_PNG_H
